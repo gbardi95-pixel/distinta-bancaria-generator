@@ -9,6 +9,25 @@ st.set_page_config(
 )
 
 
+# --- FUNZIONE PULIZIA TESTO PER FPDF (LATIN-1 ENCODING) ---
+def clean_text(text):
+  if not isinstance(text, str):
+    text = str(text)
+  replacements = {
+      "€": "EUR",
+      "°": ".",
+      "“": '"',
+      "”": '"',
+      "’": "'",
+      "`": "'",
+      "—": "-",
+  }
+  for old, new in replacements.items():
+    text = text.replace(old, new)
+  # Encode in latin-1 rimpiazzando eventuali caratteri non supportati
+  return text.encode("latin-1", "replace").decode("latin-1")
+
+
 # --- CLASSE GENERAZIONE PDF ---
 class DistintaPDF(FPDF):
 
@@ -23,7 +42,7 @@ class DistintaPDF(FPDF):
     self.cell(
         0,
         5,
-        f"Data Creazione: {date.today().strftime('%d/%m/%Y')}",
+        clean_text(f"Data Creazione: {date.today().strftime('%d/%m/%Y')}"),
         ln=True,
         align="C",
     )
@@ -32,20 +51,34 @@ class DistintaPDF(FPDF):
     # Box Dati Ordinante
     self.set_fill_color(240, 240, 240)
     self.set_font("Helvetica", "B", 10)
-    self.cell(0, 6, " DATI ORDINANTE / CONTO DI ADDEBITO", ln=True, fill=True)
+    self.cell(
+        0, 6, " DATI ORDINANTE / CONTO DI ADDEBITO", ln=True, fill=True
+    )
     self.set_font("Helvetica", "", 9)
     self.cell(
         95,
         5,
-        f" Ragione Sociale: {self.ordinante_info['ragione_sociale']}",
+        clean_text(
+            f" Ragione Sociale: {self.ordinante_info['ragione_sociale']}"
+        ),
         ln=False,
     )
-    self.cell(95, 5, f"Banca: {self.ordinante_info['banca']}", ln=True)
-    self.cell(95, 5, f" IBAN: {self.ordinante_info['iban']}", ln=False)
+    self.cell(
+        95, 5, clean_text(f"Banca: {self.ordinante_info['banca']}"), ln=True
+    )
     self.cell(
         95,
         5,
-        f"Data Esecuzione Richiesta: {self.ordinante_info['data_esecuzione']}",
+        clean_text(f" IBAN: {self.ordinante_info['iban']}"),
+        ln=False,
+    )
+    self.cell(
+        95,
+        5,
+        clean_text(
+            "Data Esecuzione Richiesta:"
+            f" {self.ordinante_info['data_esecuzione']}"
+        ),
         ln=True,
     )
     self.ln(6)
@@ -56,8 +89,10 @@ class DistintaPDF(FPDF):
     self.cell(
         0,
         4,
-        "Documento generato ad uso interno e per autorizzazione disposizioni"
-        " bancarie.",
+        clean_text(
+            "Documento generato ad uso interno e per autorizzazione"
+            " disposizioni bancarie."
+        ),
         align="C",
         ln=True,
     )
@@ -75,10 +110,10 @@ def genera_pdf_distinta(ordinante_info, df_disposizioni, totale_importo):
 
   # Larghezze colonne (totale = 190mm)
   col_w = [10, 45, 55, 55, 25]
-  headers = ["N°", "Beneficiario", "IBAN", "Causale", "Importo (€)"]
+  headers = ["N.", "Beneficiario", "IBAN", "Causale", "Importo (EUR)"]
 
   for w, header in zip(col_w, headers):
-    pdf.cell(w, 7, header, border=1, align="C", fill=True)
+    pdf.cell(w, 7, clean_text(header), border=1, align="C", fill=True)
   pdf.ln()
 
   # Righe Dati
@@ -93,16 +128,30 @@ def genera_pdf_distinta(ordinante_info, df_disposizioni, totale_importo):
 
     pdf.cell(col_w[0], 6, str(idx + 1), border=1, align="C", fill=fill)
     pdf.cell(
-        col_w[1], 6, str(row.get("Beneficiario", ""))[:25], border=1, fill=fill
+        col_w[1],
+        6,
+        clean_text(str(row.get("Beneficiario", ""))[:25]),
+        border=1,
+        fill=fill,
     )
-    pdf.cell(col_w[2], 6, str(row.get("IBAN", "")), border=1, fill=fill)
     pdf.cell(
-        col_w[3], 6, str(row.get("Causale", ""))[:30], border=1, fill=fill
+        col_w[2],
+        6,
+        clean_text(str(row.get("IBAN", ""))),
+        border=1,
+        fill=fill,
+    )
+    pdf.cell(
+        col_w[3],
+        6,
+        clean_text(str(row.get("Causale", ""))[:30]),
+        border=1,
+        fill=fill,
     )
     pdf.cell(
         col_w[4],
         6,
-        f"{float(row.get('Importo (€)', 0)):,.2f}",
+        clean_text(f"{float(row.get('Importo (€)', 0)):,.2f}"),
         border=1,
         align="R",
         fill=fill,
@@ -113,7 +162,9 @@ def genera_pdf_distinta(ordinante_info, df_disposizioni, totale_importo):
   # Totale
   pdf.set_font("Helvetica", "B", 9)
   pdf.cell(sum(col_w[:4]), 7, "TOTALE DISTINTA  ", border=1, align="R")
-  pdf.cell(col_w[4], 7, f"{totale_importo:,.2f} €", border=1, align="R")
+  pdf.cell(
+      col_w[4], 7, clean_text(f"{totale_importo:,.2f} EUR"), border=1, align="R"
+  )
   pdf.ln(12)
 
   # Firma e Autorizzazione
@@ -157,7 +208,7 @@ initial_data = pd.DataFrame({
 with tab_manual:
   df_edited = st.data_editor(
       initial_data,
-      num_rows="dynamic",  # Permette di aggiungere/eliminare righe liberamente
+      num_rows="dynamic",
       use_container_width=True,
       column_config={
           "Beneficiario": st.column_config.TextColumn(
